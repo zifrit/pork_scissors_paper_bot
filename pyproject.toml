@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "rock-scissors-paper-bot"
+version = "0.1.0"
+description = ""
+authors = ["zifrit"]
+readme = "README.md"
+packages = [{include = "rock_scissors_paper_bot"}]
+
+[tool.poetry.dependencies]
+python = "3.12"
+aiogram = "^3.4.1"
+requests = "^2.31.0"
+python-dotenv = "^1.0.1"
+pydantic-settings = "^2.2.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
