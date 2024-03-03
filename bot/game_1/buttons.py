@@ -40,13 +40,13 @@ class PaginationGames(CallbackData, prefix='orders'):
     count_page: int
 
 
-def many_page_games(page: int = 1, count_page: int = 1):
+def many_page_games(name_prev_action: str, name_nex_action: str, page: int = 1, count_page: int = 1):
     builder = InlineKeyboardBuilder()
     builder.row(
-        InlineKeyboardButton(text='⬅️', callback_data=PaginationGames(action='prev_page_rsp', page=page,
+        InlineKeyboardButton(text='⬅️', callback_data=PaginationGames(action=name_prev_action, page=page,
                                                                       count_page=count_page).pack()),
         InlineKeyboardButton(text=f'{page} из {count_page} стр.', callback_data='list games'),
-        InlineKeyboardButton(text='➡️', callback_data=PaginationGames(action='next_page_rsp', page=page,
+        InlineKeyboardButton(text='➡️', callback_data=PaginationGames(action=name_nex_action, page=page,
                                                                       count_page=count_page).pack()),
         InlineKeyboardButton(text='Назад', callback_data='back_rsp'),
         width=3
@@ -54,12 +54,12 @@ def many_page_games(page: int = 1, count_page: int = 1):
     return builder.as_markup()
 
 
-def many_page_games_without_left(page: int = 1, count_page: int = 1):
+def many_page_games_without_left(name_nex_action: str, page: int = 1, count_page: int = 1):
     builder = InlineKeyboardBuilder()
     builder.row(
         InlineKeyboardButton(text='❎', callback_data='❎'),
         InlineKeyboardButton(text=f'{page} из {count_page} стр.', callback_data='list games'),
-        InlineKeyboardButton(text='➡️', callback_data=PaginationGames(action='next_page_rsp', page=page,
+        InlineKeyboardButton(text='➡️', callback_data=PaginationGames(action=name_nex_action, page=page,
                                                                       count_page=count_page).pack()),
         InlineKeyboardButton(text='Назад', callback_data='back_rsp'),
         width=3
@@ -67,10 +67,10 @@ def many_page_games_without_left(page: int = 1, count_page: int = 1):
     return builder.as_markup()
 
 
-def many_page_games_without_right(page: int = 1, count_page: int = 1):
+def many_page_games_without_right(name_prev_action: str, page: int = 1, count_page: int = 1):
     builder = InlineKeyboardBuilder()
     builder.row(
-        InlineKeyboardButton(text='⬅️', callback_data=PaginationGames(action='prev_page_rsp', page=page,
+        InlineKeyboardButton(text='⬅️', callback_data=PaginationGames(action=name_prev_action, page=page,
                                                                       count_page=count_page).pack()),
         InlineKeyboardButton(text=f'{page} из {count_page} стр.', callback_data='list games'),
         InlineKeyboardButton(text='❎', callback_data='❎'),

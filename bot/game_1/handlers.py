@@ -63,7 +63,8 @@ async def list_of_games(callback_query: CallbackQuery):
 🕹Название игры {result['game_name']} {result['players']}
 🤝Присоединится к игре /join_rsp_{result['id']}''')
         await callback_query.message.edit_text(text='\n'.join(text),
-                                               reply_markup=buttons.many_page_games_without_left(count_page=count_page))
+                                               reply_markup=buttons.many_page_games_without_left(
+                                                   count_page=count_page, name_nex_action='next_page_rsp'))
 
     elif data['count'] == 0:
         await callback_query.message.answer(text='Еще игры не создано', reply_markup=buttons.menu)
@@ -106,13 +107,14 @@ async def paginator_service(callback_query: CallbackQuery, callback_data: button
     with suppress(TelegramBadRequest):
         if right and left:
             await callback_query.message.edit_text(reply_markup=buttons.many_page_games(
-                count_page=count_page, page=page), text='\n'.join(text))
+                count_page=count_page, page=page, name_prev_action='prev_page_rsp',
+                name_nex_action='next_page_rsp'), text='\n'.join(text))
         elif right and not left:
             await callback_query.message.edit_text(reply_markup=buttons.many_page_games_without_left(
-                count_page=count_page, page=page), text='\n'.join(text))
+                count_page=count_page, page=page, name_nex_action='next_page_rsp'), text='\n'.join(text))
         elif not right and left:
             await callback_query.message.edit_text(reply_markup=buttons.many_page_games_without_right(
-                count_page=count_page, page=page), text='\n'.join(text))
+                count_page=count_page, page=page, name_prev_action='prev_page_rsp'), text='\n'.join(text))
 
 
 @router.callback_query(F.data.in_(['menu', 'back_rsp']))
@@ -141,6 +143,78 @@ async def create_room(message: Message, state: FSMContext):
 async def join_room_game(message: Message):
     id_room_game = message.text.split('_')[-1]
     response = requests.post(f'{base_url}/games/join/{id_room_game}/', json={'player': message.from_user.id}).json()
-    print(response)
     await message.answer(text=response['massages'])
+
+
+@router.callback_query(F.data == 'personal_games')
+async def list_of_games(callback_query: CallbackQuery):
+    response = requests.get(f'{base_url}/games/user-games/', json={'id': str(callback_query.from_user.id)})
+
+    data = response.json()
+    count_page = data['count'] // 3 + 1 if data['count'] % 3 != 0 else data['count'] // 3
+    if 0 < data['count'] <= 3:
+        text = []
+        for result in data['results']:
+            text.append(f'''
+🕹Название игры {result['game_name']} {result['players']} /start_rsp_{result['id']}''')
+        await callback_query.message.answer(text='\n'.join(text))
+
+    elif data['count'] > 3:
+        text = []
+        for result in data['results']:
+            text.append(f'''
+🕹Название игры {result['game_name']} {result['players']} /start_rsp_{result['id']}''')
+        await callback_query.message.edit_text(text='\n'.join(text),
+                                               reply_markup=buttons.many_page_games_without_left(
+                                                   count_page=count_page,
+                                                   name_nex_action='next_page_pers_games'
+                                               ))
+
+    elif data['count'] == 0:
+        await callback_query.message.answer(text='Еще игры не создано', reply_markup=buttons.menu)
+
+
+@router.callback_query(buttons.PaginationGames.filter(F.action.in_(['prev_page_pers_games', 'next_page_pers_games'])))
+async def paginator_service(callback_query: CallbackQuery, callback_data: buttons.PaginationGames):
+    left = True
+    right = True
+    if callback_data.action == 'prev_page_pers_games':
+        if callback_data.page > 1:
+            page = callback_data.page - 1
+            if page <= 1:
+                left = False
+                right = True
+        else:
+            page = callback_data.page
+            left = False
+            right = True
+    elif callback_data.action == 'next_page_pers_games':
+        if callback_data.page < callback_data.count_page:
+            page = callback_data.page + 1
+            if page >= callback_data.count_page:
+                left = True
+                right = False
+        else:
+            page = callback_data.page
+            left = True
+            right = False
+    response = requests.get(
+        f'{base_url}/games/user-games/?&page={str(page)}', json={'id': str(callback_query.from_user.id)})
+    data = response.json()
+    count_page = data['count'] // 3 + 1 if data['count'] % 3 != 0 else data['count'] // 3
+    text = []
+    for result in data['results']:
+        text.append(f'''
+🕹Название игры {result['game_name']} {result['players']} /start_rsp_{result['id']}''')
+    with suppress(TelegramBadRequest):
+        if right and left:
+            await callback_query.message.edit_text(reply_markup=buttons.many_page_games(
+                count_page=count_page, page=page, name_nex_action='next_page_pers_games',
+                name_prev_action='prev_page_pers_games'), text='\n'.join(text))
+        elif right and not left:
+            await callback_query.message.edit_text(reply_markup=buttons.many_page_games_without_left(
+                count_page=count_page, page=page, name_nex_action='next_page_pers_games'), text='\n'.join(text))
+        elif not right and left:
+            await callback_query.message.edit_text(reply_markup=buttons.many_page_games_without_right(
+                count_page=count_page, page=page, name_prev_action='prev_page_pers_games'), text='\n'.join(text))
 
