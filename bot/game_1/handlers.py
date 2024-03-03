@@ -45,21 +45,77 @@ async def list_of_games(callback_query: CallbackQuery):
     response = requests.get(f'{base_url}/games/')
 
     data = response.json()
+    count_page = data['count'] // 3 + 1 if data['count'] % 3 != 0 else data['count'] // 3
     if 0 < data['count'] <= 3:
         text = []
         for result in data['results']:
             text.append(f'''
 👤Создатель {result['creator']}
 🕹Название игры {result['game_name']} {result['players']}
-🤝Присоединится к игре /join_rsp{result['id']}''')
+🤝Присоединится к игре /join_rsp_{result['id']}''')
         await callback_query.message.answer(text='\n'.join(text))
+
     elif data['count'] > 3:
-        ...
+        text = []
+        for result in data['results']:
+            text.append(f'''
+👤Создатель {result['creator']}
+🕹Название игры {result['game_name']} {result['players']}
+🤝Присоединится к игре /join_rsp_{result['id']}''')
+        await callback_query.message.edit_text(text='\n'.join(text),
+                                               reply_markup=buttons.many_page_games_without_left(count_page=count_page))
+
     elif data['count'] == 0:
-        await callback_query.message.answer(text='Еще игры не создано', reply_markup=buttons.games)
+        await callback_query.message.answer(text='Еще игры не создано', reply_markup=buttons.menu)
 
 
-@router.callback_query(F.data == 'menu')
+@router.callback_query(buttons.PaginationGames.filter(F.action.in_(['prev_page_rsp', 'next_page_rsp'])))
+async def paginator_service(callback_query: CallbackQuery, callback_data: buttons.PaginationGames):
+    left = True
+    right = True
+    if callback_data.action == 'prev_page_rsp':
+        if callback_data.page > 1:
+            page = callback_data.page - 1
+            if page <= 1:
+                left = False
+                right = True
+        else:
+            page = callback_data.page
+            left = False
+            right = True
+    elif callback_data.action == 'next_page_rsp':
+        if callback_data.page < callback_data.count_page:
+            page = callback_data.page + 1
+            if page >= callback_data.count_page:
+                left = True
+                right = False
+        else:
+            page = callback_data.page
+            left = True
+            right = False
+    response = requests.get(
+        f'{base_url}/games/?&page={str(page)}')
+    data = response.json()
+    count_page = data['count'] // 3 + 1 if data['count'] % 3 != 0 else data['count'] // 3
+    text = []
+    for result in data['results']:
+        text.append(f'''
+👤Создатель {result['creator']}
+🕹Название игры {result['game_name']} {result['players']}
+🤝Присоединится к игре /join_rsp_{result['id']}''')
+    with suppress(TelegramBadRequest):
+        if right and left:
+            await callback_query.message.edit_text(reply_markup=buttons.many_page_games(
+                count_page=count_page, page=page), text='\n'.join(text))
+        elif right and not left:
+            await callback_query.message.edit_text(reply_markup=buttons.many_page_games_without_left(
+                count_page=count_page, page=page), text='\n'.join(text))
+        elif not right and left:
+            await callback_query.message.edit_text(reply_markup=buttons.many_page_games_without_right(
+                count_page=count_page, page=page), text='\n'.join(text))
+
+
+@router.callback_query(F.data.in_(['menu', 'back_rsp']))
 async def menu(callback_query: CallbackQuery):
     await callback_query.message.edit_text(text='игра 🪨✂️📄', reply_markup=buttons.games)
 
@@ -79,3 +135,12 @@ async def create_room(message: Message, state: FSMContext):
     }
     requests.post(f'{base_url}/games/', json=json_data)
     await message.answer(text='игра создалась!', reply_markup=buttons.games)
+
+
+@router.message(F.text.startswith('/join_rsp'))
+async def join_room_game(message: Message):
+    id_room_game = message.text.split('_')[-1]
+    response = requests.post(f'{base_url}/games/join/{id_room_game}/', json={'player': message.from_user.id}).json()
+    print(response)
+    await message.answer(text=response['massages'])
+
