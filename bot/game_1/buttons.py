@@ -78,3 +78,23 @@ def many_page_games_without_right(name_prev_action: str, page: int = 1, count_pa
         width=3
     )
     return builder.as_markup()
+
+
+class GamesAnswer(CallbackData, prefix='rsp'):
+    user: str
+    games_id: str
+    games_name: str
+    action: str
+
+
+def rsp_cmd(user: str = '', games_id: str = '', games_name: str = ''):
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(text='🪨', callback_data=GamesAnswer(action='rock', user=user, games_id=games_id,
+                                                                 games_name=games_name).pack()),
+        InlineKeyboardButton(text='📄', callback_data=GamesAnswer(action='paper', user=user, games_id=games_id,
+                                                                 games_name=games_name).pack()),
+        InlineKeyboardButton(text='✂️', callback_data=GamesAnswer(action='scissors', user=user, games_id=games_id,
+                                                                  games_name=games_name).pack()),
+    )
+    return builder.as_markup()
