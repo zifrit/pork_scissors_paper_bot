@@ -123,7 +123,7 @@ async def paginator_service(callback_query: CallbackQuery, callback_data: button
                 count_page=count_page, page=page, name_prev_action='prev_page_rsp'), text='\n'.join(text))
 
 
-@router.callback_query(F.data.in_(['menu', 'back_rsp']))
+@router.callback_query(F.data.in_(['menu', 'back_rsp', 'back_rsp_menu']))
 async def menu(callback_query: CallbackQuery):
     await callback_query.message.edit_text(text='игра 🪨✂️📄', reply_markup=buttons.games)
 
@@ -149,10 +149,10 @@ async def create_room(message: Message, state: FSMContext):
 async def join_room_game(message: Message):
     id_room_game = message.text.split('_')[-1]
     response = requests.post(f'{base_url}/games/join/{id_room_game}/', json={'player': message.from_user.id}).json()
-    await message.answer(text=response['massages'])
+    await message.answer(text=response['message'])
 
 
-@router.callback_query(F.data == 'personal_games')
+@router.callback_query(F.data.in_(['personal_games', 'back_personal_games']))
 async def list_of_games(callback_query: CallbackQuery):
     response = requests.get(f'{base_url}/games/user-games/', json={'id': str(callback_query.from_user.id)})
 
@@ -164,8 +164,8 @@ async def list_of_games(callback_query: CallbackQuery):
             text.append(f'''
 🕹Название игры {result['game_name']} 
 👥Число участников {result['players']} 
-/start_rsp_{result['id']}''')
-        await callback_query.message.answer(text='\n'.join(text))
+/rsp_{result['id']}''')
+        await callback_query.message.answer(text='\n'.join(text), reply_markup=buttons.back_rsp_menu)
 
     elif data['count'] > 3:
         text = []
@@ -173,7 +173,7 @@ async def list_of_games(callback_query: CallbackQuery):
             text.append(f'''
 🕹Название игры {result['game_name']} 
 👥Число участников {result['players']} 
-/start_rsp_{result['id']}''')
+/rsp_{result['id']}''')
         await callback_query.message.edit_text(text='\n'.join(text),
                                                reply_markup=buttons.many_page_games_without_left(
                                                    count_page=count_page,
@@ -217,7 +217,7 @@ async def paginator_service(callback_query: CallbackQuery, callback_data: button
         text.append(f'''
 🕹Название игры {result['game_name']} 
 👥Число участников {result['players']} 
-/start_rsp_{result['id']}''')
+/rsp_{result['id']}''')
     with suppress(TelegramBadRequest):
         if right and left:
             await callback_query.message.edit_text(reply_markup=buttons.many_page_games(
@@ -231,25 +231,61 @@ async def paginator_service(callback_query: CallbackQuery, callback_data: button
                 count_page=count_page, page=page, name_prev_action='prev_page_pers_games'), text='\n'.join(text))
 
 
-@router.message(F.text.startswith('/start_rsp'))
-async def start_games(message: Message, bot):
+@router.message(F.text.startswith('/rsp_'))
+async def info_persona_games(message: Message):
     id_room_game = message.text.split('_')[-1]
     response = requests.get(f'{base_url}/games/{id_room_game}/player').json()
+    players = list(response['players'].values())
+    if response['status']:
+        text = f'''
+Название: {response['games_name']}
+Игроки: @{players[0]}, @{players[1]}
+        '''
+        await message.answer(text=text,
+                             reply_markup=buttons.crud_rsp(games_id=id_room_game, games_name=response['games_name']))
+    else:
+        text = f'''
+Название: {response['games_name']}
+Игроки: @{players[0]}
+{response['message']}
+                '''
+        await message.answer(text=text, reply_markup=buttons.back_personal_games)
+
+
+@router.callback_query(buttons.GamesCRUD.filter(F.action == 'start_rsp'))
+async def start_games(callback_query: CallbackQuery, callback_data: buttons.PaginationGames):
+    id_room_game = callback_data.games_id
+    response = requests.get(f'{base_url}/games/{id_room_game}/player').json()
+    players = list(response['players'].keys())
     if response['status']:
         redis_key = f'rsp_{id_room_game}'
         if not db_redis.hgetall(redis_key):
-            room = db_redis.hset(redis_key, mapping={player: 'None' for player in response['players']})
+            room = db_redis.hset(redis_key, mapping={player: 'None' for player in players})
         text = f'Ига {response["games_name"]} началась.\nВыберите ваш ответ'
-        await message.bot.send_message(chat_id=response['players'][0], text=text,
-                                       reply_markup=buttons.rsp_cmd(
-                                           user=str(message.from_user.id),
-                                           games_id=id_room_game, games_name=response["games_name"]))
-        await message.bot.send_message(chat_id=response['players'][1], text=text,
-                                       reply_markup=buttons.rsp_cmd(
-                                           user=str(message.from_user.id),
-                                           games_id=id_room_game, games_name=response["games_name"]))
+        await callback_query.bot.send_message(chat_id=players[0], text=text,
+                                              reply_markup=buttons.gameplay_rsp(
+                                                  user=str(callback_query.from_user.id),
+                                                  games_id=id_room_game, games_name=response["games_name"]))
+        await callback_query.bot.send_message(chat_id=players[1], text=text,
+                                              reply_markup=buttons.gameplay_rsp(
+                                                  user=str(callback_query.from_user.id),
+                                                  games_id=id_room_game, games_name=response["games_name"]))
     else:
-        await message.answer(text=response['massage'])
+        await callback_query.message.answer(text=response['message'])
+
+
+@router.callback_query(buttons.GamesCRUD.filter(F.action == 'delete_users_rsp'))
+async def delete_games(callback_query: CallbackQuery, callback_data: buttons.PaginationGames):
+    id_room_game = callback_data.games_id
+    response = requests.post(f'{base_url}/games/{id_room_game}/delete-players/').json()
+    await callback_query.message.edit_text(text=response['message'])
+
+
+@router.callback_query(buttons.GamesCRUD.filter(F.action == 'delete_games_rsp'))
+async def delete_games_users(callback_query: CallbackQuery, callback_data: buttons.PaginationGames):
+    id_room_game = callback_data.games_id
+    response = requests.delete(f'{base_url}/games/{id_room_game}/').json()
+    await callback_query.message.edit_text(text=response['message'])
 
 
 @router.callback_query(buttons.GamesAnswer.filter(F.action.in_(['rock', 'scissors', 'paper'])))
@@ -280,18 +316,24 @@ async def games(callback_query: CallbackQuery, callback_data: buttons.Pagination
                 (data_str[players[0]] == 'scissors' and data_str[players[1]] == 'paper') or
                 (data_str[players[0]] == 'paper' and data_str[players[1]] == 'rock')):
 
-            await callback_query.bot.send_message(chat_id=players[0], text="Вы выиграли", )
-            await callback_query.bot.send_message(chat_id=players[1], text="Вы проиграли", )
+            await callback_query.bot.send_message(chat_id=players[0],
+                                                  text=f"В игре '{callback_data.games_name}', вы выиграли", )
+            await callback_query.bot.send_message(chat_id=players[1],
+                                                  text=f"В игре '{callback_data.games_name}', Вы проиграли", )
 
         elif ((data_str[players[1]] == 'rock' and data_str[players[0]] == 'scissors') or
               (data_str[players[1]] == 'scissors' and data_str[players[0]] == 'paper') or
               (data_str[players[1]] == 'paper' and data_str[players[0]] == 'rock')):
 
-            await callback_query.bot.send_message(chat_id=players[1], text="Вы выиграли", )
-            await callback_query.bot.send_message(chat_id=players[0], text="Вы проиграли", )
+            await callback_query.bot.send_message(chat_id=players[1],
+                                                  text=f"В игре '{callback_data.games_name}', вы выиграли", )
+            await callback_query.bot.send_message(chat_id=players[0],
+                                                  text=f"В игре '{callback_data.games_name}', Вы проиграли", )
 
         elif data_str[players[1]] == data_str[players[0]]:
 
-            await callback_query.bot.send_message(chat_id=players[1], text="Ничья", )
-            await callback_query.bot.send_message(chat_id=players[0], text="Ничья", )
+            await callback_query.bot.send_message(chat_id=players[1],
+                                                  text=f"В игре '{callback_data.games_name}', у вас ничья", )
+            await callback_query.bot.send_message(chat_id=players[0],
+                                                  text=f"В игре '{callback_data.games_name}', у вас ничья", )
         answer = db_redis.delete(redis_key)

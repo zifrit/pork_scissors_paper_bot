@@ -80,14 +80,23 @@ def many_page_games_without_right(name_prev_action: str, page: int = 1, count_pa
     return builder.as_markup()
 
 
-class GamesAnswer(CallbackData, prefix='rsp'):
+back_rsp_menu = InlineKeyboardMarkup(
+    inline_keyboard=[
+        [
+            InlineKeyboardButton(text='Назад', callback_data='back_rsp_menu'),
+        ],
+    ],
+)
+
+
+class GamesAnswer(CallbackData, prefix='gameplay_rsp'):
     user: str
     games_id: str
     games_name: str
     action: str
 
 
-def rsp_cmd(user: str = '', games_id: str = '', games_name: str = ''):
+def gameplay_rsp(user: str = '', games_id: str = '', games_name: str = ''):
     builder = InlineKeyboardBuilder()
     builder.row(
         InlineKeyboardButton(text='🪨', callback_data=GamesAnswer(action='rock', user=user, games_id=games_id,
@@ -98,3 +107,33 @@ def rsp_cmd(user: str = '', games_id: str = '', games_name: str = ''):
                                                                   games_name=games_name).pack()),
     )
     return builder.as_markup()
+
+
+class GamesCRUD(CallbackData, prefix='crud_rsp_'):
+    action: str
+    games_id: str
+    games_name: str
+
+
+def crud_rsp(games_id: str = '', games_name: str = ''):
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(text='Удалить игроков', callback_data=GamesCRUD(
+            action='delete_users_rsp', games_id=games_id, games_name=games_name).pack()),
+
+        InlineKeyboardButton(text='Начать игру', callback_data=GamesCRUD(
+            action='start_rsp', games_id=games_id, games_name=games_name).pack()),
+
+        InlineKeyboardButton(text='Удалить игру', callback_data=GamesCRUD(
+            action='delete_games_rsp', games_id=games_id, games_name=games_name).pack()),
+    )
+    return builder.as_markup()
+
+
+back_personal_games = InlineKeyboardMarkup(
+    inline_keyboard=[
+        [
+            InlineKeyboardButton(text='Назад', callback_data='back_personal_games'),
+        ],
+    ],
+)
