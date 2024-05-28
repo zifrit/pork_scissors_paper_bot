@@ -115,7 +115,7 @@ class GamesCRUD(CallbackData, prefix='crud_rsp_'):
     games_name: str
 
 
-def crud_rsp(games_id: str = '', games_name: str = ''):
+def crud_rsp_2_players(games_id: str = '', games_name: str = ''):
     builder = InlineKeyboardBuilder()
     builder.row(
         InlineKeyboardButton(text='Удалить игроков', callback_data=GamesCRUD(
@@ -130,10 +130,12 @@ def crud_rsp(games_id: str = '', games_name: str = ''):
     return builder.as_markup()
 
 
-back_personal_games = InlineKeyboardMarkup(
-    inline_keyboard=[
-        [
-            InlineKeyboardButton(text='Назад', callback_data='back_personal_games'),
-        ],
-    ],
-)
+def crud_rsp_1_player(games_id: str = '', games_name: str = ''):
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(text='Назад', callback_data='back_personal_games'),
+
+        InlineKeyboardButton(text='Удалить игру', callback_data=GamesCRUD(
+            action='delete_games_rsp', games_id=games_id, games_name=games_name).pack()),
+    )
+    return builder.as_markup()

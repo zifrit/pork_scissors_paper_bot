@@ -242,14 +242,16 @@ async def info_persona_games(message: Message):
 Игроки: @{players[0]}, @{players[1]}
         '''
         await message.answer(text=text,
-                             reply_markup=buttons.crud_rsp(games_id=id_room_game, games_name=response['games_name']))
+                             reply_markup=buttons.crud_rsp_2_players(games_id=id_room_game,
+                                                                     games_name=response['games_name']))
     else:
         text = f'''
 Название: {response['games_name']}
 Игроки: @{players[0]}
 {response['message']}
                 '''
-        await message.answer(text=text, reply_markup=buttons.back_personal_games)
+        await message.answer(text=text, reply_markup=buttons.crud_rsp_1_player(games_id=id_room_game,
+                                                                               games_name=response['games_name']))
 
 
 @router.callback_query(buttons.GamesCRUD.filter(F.action == 'start_rsp'))
