@@ -276,6 +276,28 @@ async def start_games(callback_query: CallbackQuery, callback_data: buttons.Pagi
         await callback_query.message.answer(text=response['message'])
 
 
+@router.message(F.text.startswith('/start_rsp'))
+async def start_games(message: Message):
+    id_room_game = message.text.split('_')[-1]
+    response = requests.get(f'{base_url}/games/{id_room_game}/player').json()
+    players = list(response['players'].keys())
+    if response['status']:
+        redis_key = f'rsp_{id_room_game}'
+        if not db_redis.hgetall(redis_key):
+            room = db_redis.hset(redis_key, mapping={player: 'None' for player in players})
+        text = f'Ига {response["games_name"]} началась.\nВыберите ваш ответ'
+        await message.bot.send_message(chat_id=players[0], text=text,
+                                       reply_markup=buttons.gameplay_rsp(
+                                           user=str(message.from_user.id),
+                                           games_id=id_room_game, games_name=response["games_name"]))
+        await message.bot.send_message(chat_id=players[1], text=text,
+                                       reply_markup=buttons.gameplay_rsp(
+                                           user=str(message.from_user.id),
+                                           games_id=id_room_game, games_name=response["games_name"]))
+    else:
+        await message.answer(text=response['message'])
+
+
 @router.callback_query(buttons.GamesCRUD.filter(F.action == 'delete_users_rsp'))
 async def delete_games(callback_query: CallbackQuery, callback_data: buttons.PaginationGames):
     id_room_game = callback_data.games_id
